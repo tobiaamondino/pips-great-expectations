@@ -398,7 +398,7 @@ function showEnd(){
 }
 
 /* ================= class leaderboard (Firebase Realtime Database, REST) ================= */
-const LB_URL='';   // e.g. https://my-project-default-rtdb.europe-west1.firebasedatabase.app  (empty = leaderboard hidden)
+const LB_URL='https://pip-s-game-default-rtdb.europe-west1.firebasedatabase.app';   // Firebase Realtime Database (empty = leaderboard hidden)
 const LB_ON=!!LB_URL;
 let playerName='';try{playerName=localStorage.getItem('pge_name')||'';}catch(e){}
 const cleanName=s=>(s||'').replace(/[^\p{L}\p{N} _.\-]/gu,'').replace(/\s+/g,' ').trim().slice(0,14);
