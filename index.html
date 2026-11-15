@@ -167,7 +167,7 @@ const DEFS=[
    ground:[[0,700],[770,1500],[1570,2300],[2370,3000]],
    plats:[[420,250,80],[1090,250,90],[1330,236,70],[1850,250,80],[2420,250,80]],
    haz:[[350,30],[560,30],[950,40],[1230,30],[1700,30],[1920,50],[2130,30],[2560,40],[2760,30]],
-   en:[[1000,1180,'crow'],[1780,1890,'crow'],[2600,2740,'crow']],
+   en:[[1000,1180,'crow'],[1750,1845,'crow'],[2600,2740,'crow']],
    items:[It(455,232),It(1125,232),It(1360,218),It(1885,232),It(2455,232),Ht(150),Ht(240),Ht(620),Ht(860),Ht(1400),Ht(1620),Ht(2000),Ht(2335,255),Ht(2900)],
    cps:[0,800,1620,2400],
    npcs:[[2840,'magwitch',['Good boy... is that bread?','You tell no one, mind.']]],
@@ -246,8 +246,29 @@ function buildLevel(d){
   L.items=d.items.map(([x,y,k])=>({x,y,k,got:false}));
   L.cps=d.cps;L.npcs=d.npcs.map(([x,k,lines])=>({x,k,lines}));
   L.props=d.props||[];
+  relocateBeams(L);
   genBg(L);
   return L;
+}
+/* Beams are solid, so keep them clear of hazards and enemies and over solid ground. */
+function relocateBeams(L){
+  const M=36;
+  const blockers=[...L.haz.map(h=>[h.x,h.x+h.w]),...L.en.map(e=>[e.x0,e.x1+e.w])];
+  const free=(x,w)=>L.grounds.some(g=>x-20>=g.x&&x+w+20<=g.x+g.w)&&!blockers.some(([a,b])=>x-M<b&&x+w+M>a);
+  const placed=[];
+  for(const pl of L.plats){
+    const its=L.items.filter(it=>it.y<pl.y&&it.y>=pl.y-32&&it.x>=pl.x-4&&it.x<=pl.x+pl.w+4);
+    let best=null;
+    for(let d=0;d<=600&&best===null;d+=10){
+      for(const s of (d===0?[1]:[1,-1])){
+        const nx=pl.x+s*d;
+        if(free(nx,pl.w)&&!placed.some(q=>nx<q.x+q.w+40&&nx+pl.w>q.x-40)){best=nx;break;}
+      }
+    }
+    if(best!==null){const dx=best-pl.x;pl.x=best;for(const it of its)it.x+=dx;placed.push(pl);}
+    else pl.dead=true;   // no safe spot: drop the beam, its items stay reachable with a jump
+  }
+  L.plats=L.plats.filter(p=>!p.dead);
 }
 
 /* ================= game state ================= */
@@ -373,10 +394,23 @@ function update(dt){
       p.vx=0;
     }
   }
+  // beams are solid: Pip cannot walk into their side
+  for(const pl of LV.plats){
+    if(p.x+p.w>pl.x&&p.x<pl.x+pl.w&&p.y+p.h>pl.y+2&&p.y<pl.y+pl.h){
+      if(p.vx>0)p.x=pl.x-p.w;else if(p.vx<0)p.x=pl.x+pl.w;else if(p.x+p.w/2<pl.x+pl.w/2)p.x=pl.x-p.w;else p.x=pl.x+pl.w;
+      p.vx=0;
+    }
+  }
   // Y movement
-  const pb=p.y+p.h;
+  const pb=p.y+p.h,pt=p.y;
   p.y+=p.vy*dt;p.on=false;
   const nb=p.y+p.h;
+  // beams are solid from below: Pip bumps his head instead of passing through
+  if(p.vy<0){
+    for(const pl of LV.plats){
+      if(p.x+p.w>pl.x+1&&p.x<pl.x+pl.w-1&&pt>=pl.y+pl.h-1&&p.y<pl.y+pl.h){p.y=pl.y+pl.h;p.vy=0;}
+    }
+  }
   if(p.vy>=0){
     for(const g of LV.grounds){
       if(p.x+p.w>g.x+1&&p.x<g.x+g.w-1&&pb<=g.y+2&&nb>=g.y){p.y=g.y-p.h;p.vy=0;p.on=true;}
