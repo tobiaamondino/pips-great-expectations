@@ -502,7 +502,6 @@ function drawHaz(L,cx){
     const sx=h.x-cx;if(sx>W||sx+h.w<0)continue;
     ctx.fillStyle=L.T.haz;
     for(let x=0;x<h.w;x+=8){ctx.beginPath();ctx.moveTo(sx+x,GY);ctx.lineTo(sx+x+4,GY-13);ctx.lineTo(sx+x+8,GY);ctx.closePath();ctx.fill();}
-    if(L.theme==='satis'){ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx,GY-12);ctx.lineTo(sx+h.w,GY-12);ctx.stroke();}
   }
 }
 function person(x,y,dir,moving,o){
