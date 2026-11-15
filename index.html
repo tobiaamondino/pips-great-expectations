@@ -398,7 +398,7 @@ function showEnd(){
 }
 
 /* ================= class leaderboard (Firebase Realtime Database, REST) ================= */
-const LB_URL='https://pip-s-game-default-rtdb.europe-west1.firebasedatabase.app';   // Firebase Realtime Database (empty = leaderboard hidden)
+const LB_URL='';   // Firebase Realtime Database (empty = leaderboard hidden)
 const LB_ON=!!LB_URL;
 let playerName='';try{playerName=localStorage.getItem('pge_name')||'';}catch(e){}
 const cleanName=s=>(s||'').replace(/[^\p{L}\p{N} _.\-]/gu,'').replace(/\s+/g,' ').trim().slice(0,14);
@@ -738,11 +738,11 @@ function hud(){
 function drawControls(){
   const act=stick.id!==null;
   ctx.globalAlpha=act?.35:.18;
-  const bx=act?stick.ox:92+SAFE_L,by=act?stick.oy:226;
+  const bx=act?stick.ox:46+SAFE_L,by=act?stick.oy:226;
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,38,0,7);ctx.fill();
   ctx.globalAlpha=act?.6:.25;
   ctx.beginPath();ctx.arc(bx+(act?stick.x*34:0),by+(act?stick.y*10:0),17,0,7);ctx.fill();
-  const jx=W-75-SAFE_R;ctx.globalAlpha=jumpHeld?.45:.2;ctx.beginPath();ctx.arc(jx,226,36,0,7);ctx.fill();
+  const jx=W-46-SAFE_R;ctx.globalAlpha=jumpHeld?.45:.2;ctx.beginPath();ctx.arc(jx,226,36,0,7);ctx.fill();
   ctx.globalAlpha=.8;ctx.fillStyle='#1a1420';ctx.font='bold 13px Georgia';ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillText('JUMP',jx,226);
   ctx.textAlign='left';ctx.globalAlpha=1;
 }
