@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Pip">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d0b14">
 <title>Pip's Great Expectations</title>
@@ -34,33 +39,50 @@ button{font:inherit;cursor:pointer}
 #rot{position:fixed;inset:0;z-index:20;background:#0d0b14;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:20px;line-height:1.4;color:var(--gold)}
 #rot b{display:block;font-size:56px;margin-bottom:10px}
 @media (orientation:portrait){#rot{display:flex}}
+#fs{position:fixed;top:max(6px,env(safe-area-inset-top));right:calc(max(8px,env(safe-area-inset-right)) + 46px);z-index:5;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;width:40px;height:34px;font-size:18px;line-height:1;display:none}
+.nm{display:block;width:min(70%,320px);margin:1vh auto;padding:1.1vh 2vw;font:inherit;font-size:16px;text-align:center;color:var(--paper);background:#2c2236;border:2px solid #5a4a6a;border-radius:10px;-webkit-user-select:text;user-select:text}
+.nm.err{border-color:#ff7a8e}
+.btn.alt{background:#2c2236;color:var(--gold);border:2px solid var(--gold);margin-left:1vw}
+.lb{list-style:none;margin:.8vh auto;padding:0;max-width:420px;text-align:left}
+.lb li{display:flex;gap:1.6vw;padding:.6vh 1.4vw;border-radius:8px;font-size:clamp(12px,3.4vh,18px)}
+.lb li:nth-child(odd){background:rgba(255,255,255,.05)}
+.lb li.me{background:rgba(232,196,106,.22);outline:1px solid var(--gold)}
+.lb .r{width:2.4em;color:var(--gold)}.lb .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lb .s{font-weight:bold}
 </style>
 </head>
 <body>
 <div id="wrap"><canvas id="cv"></canvas></div>
 <div id="ov"><div class="card" id="card"></div></div>
 <button id="mute" aria-label="Sound on/off">🔊</button>
+<button id="fs" aria-label="Full screen">⛶</button>
 <div id="rot"><div><b>⟳</b>Please turn your phone sideways<br><span style="font-size:15px;opacity:.8">(landscape) to play</span></div></div>
 
 <script>
 (()=>{
 'use strict';
 /* ================= basics ================= */
-const W=640,H=360,GY=300;
+let W=640;const H=360,GY=300;
 const SPEED=125,JUMP=372,GRAV=950;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const $=s=>document.querySelector(s);
 const ovEl=$('#ov'),card=$('#card');
-let cssScale=1,S=2;
+let cssScale=1,S=2,SAFE_L=0,SAFE_R=0;
+const probe=document.createElement('div');
+probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)';
+document.body.appendChild(probe);
 function resize(){
   const iw=window.innerWidth,ih=window.innerHeight;
-  cssScale=Math.min(iw/W,ih/H);
+  let sc=ih/H,w=Math.round(iw/sc);
+  if(w<640){sc=iw/640;w=640;}      // narrow screen (tablet): small bars top/bottom
+  W=Math.min(960,w);cssScale=sc;   // wide phone: show more of the world, no side bars
   const dpr=window.devicePixelRatio||1;
   S=Math.max(1,Math.min(4,Math.round(cssScale*dpr)));
   cv.width=W*S;cv.height=H*S;
   cv.style.width=(W*cssScale)+'px';cv.style.height=(H*cssScale)+'px';
+  const cs=getComputedStyle(probe);
+  SAFE_L=Math.round((parseFloat(cs.paddingLeft)||0)/cssScale);SAFE_R=Math.round((parseFloat(cs.paddingRight)||0)/cssScale);
 }
-addEventListener('resize',resize);resize();
+addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,200));resize();
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{if(!e.target.closest('.card'))e.preventDefault();},{passive:false});
@@ -74,6 +96,14 @@ const muteBtn=$('#mute');
 function paintMute(){muteBtn.textContent=muted?'🔇':'🔊';}
 paintMute();
 muteBtn.addEventListener('click',()=>{muted=!muted;paintMute();try{localStorage.setItem('pge_muted',muted?'1':'0');}catch(e){}});
+const fsBtn=$('#fs'),de=document.documentElement,reqFS=de.requestFullscreen||de.webkitRequestFullscreen;
+if(reqFS){
+  fsBtn.style.display='block';
+  fsBtn.addEventListener('click',()=>{
+    if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}
+    else{Promise.resolve(reqFS.call(de)).then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}
+  });
+}
 function audio(){
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(AC&&AC.state==='suspended')AC.resume();
@@ -130,6 +160,7 @@ cv.addEventListener('pointerup',release);
 cv.addEventListener('pointercancel',release);
 cv.addEventListener('lostpointercapture',release);
 addEventListener('keydown',e=>{
+  if(e.target&&e.target.tagName==='INPUT')return;
   audio();
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
   if(!keys[e.code]&&(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW')){jumpBuf=0.14;}
@@ -233,9 +264,9 @@ const QUIZ=[
 function genBg(L){
   let seed=L.w*7+13;
   const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
-  L.far=[];for(let x=-100;x<L.w*.3+W+160;x+=60+rnd()*80)L.far.push({x,w:60+rnd()*90,h:40+rnd()*70,r:rnd()});
-  L.near=[];for(let x=-100;x<L.w*.6+W+160;x+=34+rnd()*54)L.near.push({x,w:20+rnd()*40,h:18+rnd()*44,r:rnd()});
-  L.stars=[];for(let i=0;i<50;i++)L.stars.push({x:rnd()*W,y:rnd()*170,s:rnd()});
+  L.far=[];for(let x=-100;x<L.w*.3+1000;x+=60+rnd()*80)L.far.push({x,w:60+rnd()*90,h:40+rnd()*70,r:rnd()});
+  L.near=[];for(let x=-100;x<L.w*.6+1000;x+=34+rnd()*54)L.near.push({x,w:20+rnd()*40,h:18+rnd()*44,r:rnd()});
+  L.stars=[];for(let i=0;i<50;i++)L.stars.push({x:rnd()*960,y:rnd()*170,s:rnd()});
 }
 function buildLevel(d){
   const L={name:d.name,theme:d.theme,w:d.w,T:THEME[d.theme],goalX:d.goal};
@@ -314,13 +345,24 @@ function showStory(i){
   showCard(`<div class="tag">${s.ch}</div><h2>${DEFS[i].name}</h2><p>${s.t}</p><p class="small">🎯 ${s.g}</p><button class="btn" id="go">Play ▶</button>`);
   $('#go').onclick=()=>{audio();loadLevel(i);};
 }
+const IS_IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const STANDALONE=!!(navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches));
+function startGame(){audio();stats.hearts=stats.coins=stats.items=stats.stomps=stats.deaths=stats.quiz=0;showStory(0);}
 function showTitle(){
   state='title';
   showCard(`<h1>Pip's Great Expectations</h1><p>A tiny game based on the novel by Charles Dickens</p>
-  <p class="small">👍 Left thumb: move &nbsp;·&nbsp; Right thumb: jump<br>Stomp enemies from above · Collect ♥ hearts<br>PC: arrows / WASD + Space</p>
-  ${best?`<p class="small">Best score: ${best}</p>`:''}
-  <button class="btn" id="go">Start ▶</button>`);
-  $('#go').onclick=()=>{audio();stats.hearts=stats.coins=stats.items=stats.stomps=stats.deaths=stats.quiz=0;showStory(0);};
+  ${LB_ON?`<input id="nm" class="nm" maxlength="14" placeholder="Choose your nickname" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="go">`:''}
+  <p class="small">👍 Left thumb: move · Right thumb: jump · Stomp enemies from above · Collect ♥<br>PC: arrows / WASD + Space</p>
+  ${best?`<p class="small">Your best: ${best}</p>`:''}
+  ${IS_IOS&&!STANDALONE?`<p class="small">📲 Full screen on iPhone: tap Share ⬆ → “Add to Home Screen”, then open Pip from your Home Screen.</p>`:''}
+  <div><button class="btn" id="go">Start ▶</button>${LB_ON?`<button class="btn alt" id="lbBtn">🏆 Leaderboard</button>`:''}</div>`);
+  const nm=$('#nm');
+  if(nm){nm.value=playerName;nm.addEventListener('input',()=>nm.classList.remove('err'));}
+  $('#go').onclick=()=>{
+    if(nm){const n=cleanName(nm.value);if(!n){nm.classList.add('err');nm.focus();return;}playerName=n;try{localStorage.setItem('pge_name',n);}catch(e){}}
+    startGame();
+  };
+  const lb=$('#lbBtn');if(lb)lb.onclick=()=>showLeaderboard(null,showTitle);
 }
 function showQuiz(i){
   state='quiz';const q=QUIZ[i];
@@ -340,15 +382,67 @@ function endingRank(){
   if(stats.quiz>=3)return 'True Friend of Joe';
   return 'Pip, the Dreamer';
 }
+let submitP=null,lastRun=null;
 function showEnd(){
   state='end';
   const sc=score();let newBest=false;if(sc>best){best=sc;newBest=true;try{localStorage.setItem('pge_best',String(sc));}catch(e){}}
+  lastRun={name:playerName,score:sc};
+  submitP=LB_ON?lbSubmit(playerName,sc).catch(()=>null):null;
   showCard(`<div class="tag">The End</div><h2>A new beginning</h2>
   <p>Pip understood how much Joe's love meant, more than any fortune. Years later, among the ruins of Satis House, he met Estella again. Both had been changed by sorrow, and they left the place hand in hand.</p>
   <p class="small"><i>“I saw no shadow of another parting from her.”</i> — Charles Dickens</p>
   <p>♥ ${stats.hearts} &nbsp; 🪙 ${stats.coins} &nbsp; ❓ ${stats.quiz}/5 &nbsp; ↺ ${stats.deaths}<br><b>Score ${sc}</b> ${newBest?'· new best!':''} · ${endingRank()}</p>
-  <button class="btn" id="go">Play again ↺</button>`,true);
-  $('#go').onclick=()=>{showTitle();};
+  <div>${LB_ON?`<button class="btn" id="lbGo">🏆 Leaderboard ▶</button>`:''}<button class="btn ${LB_ON?'alt':''}" id="go">Play again ↺</button></div>`,true);
+  $('#go').onclick=()=>showTitle();
+  const b=$('#lbGo');if(b)b.onclick=()=>showLeaderboard(lastRun,null);
+}
+
+/* ================= class leaderboard (Firebase Realtime Database, REST) ================= */
+const LB_URL='';   // e.g. https://my-project-default-rtdb.europe-west1.firebasedatabase.app  (empty = leaderboard hidden)
+const LB_ON=!!LB_URL;
+let playerName='';try{playerName=localStorage.getItem('pge_name')||'';}catch(e){}
+const cleanName=s=>(s||'').replace(/[^\p{L}\p{N} _.\-]/gu,'').replace(/\s+/g,' ').trim().slice(0,14);
+function fetchT(url,opt,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms||7000);return fetch(url,Object.assign({signal:c.signal},opt||{})).finally(()=>clearTimeout(t));}
+async function lbSubmit(name,sc){
+  const r=await fetchT(LB_URL+'/scores.json',{method:'POST',body:JSON.stringify({name,score:sc,t:Date.now()})});
+  if(!r.ok)throw new Error('submit');
+  return true;
+}
+async function lbTop(){
+  const r=await fetchT(LB_URL+'/scores.json?orderBy=%22score%22&limitToLast=300');
+  if(!r.ok)throw new Error('load');
+  const j=(await r.json())||{};
+  const best=new Map();
+  for(const v of Object.values(j)){
+    if(!v||typeof v.name!=='string'||typeof v.score!=='number')continue;
+    const k=v.name.toLowerCase();
+    if(!best.has(k)||best.get(k).score<v.score)best.set(k,v);
+  }
+  return [...best.values()].sort((a,b)=>b.score-a.score||(a.t||0)-(b.t||0));
+}
+function lbRow(rank,v,isMe){
+  const li=document.createElement('li');if(isMe)li.className='me';
+  const r=document.createElement('span');r.className='r';r.textContent='#'+rank;
+  const n=document.createElement('span');n.className='n';n.textContent=v.name;
+  const sc=document.createElement('span');sc.className='s';sc.textContent=v.score;
+  li.append(r,n,sc);return li;
+}
+async function showLeaderboard(me,back){
+  showCard(`<div class="tag">Class leaderboard</div><h2>🏆 Top players</h2><p class="small" id="lbMsg">Loading…</p><ol class="lb" id="lbList"></ol><div id="lbBtns"><button class="btn" id="bk">${back?'◀ Back':'Play again ↺'}</button></div>`);
+  $('#bk').onclick=back||showTitle;
+  try{
+    if(submitP&&me)await submitP;
+    const list=await lbTop();
+    const ul=$('#lbList'),msg=$('#lbMsg');
+    if(!ul)return;
+    if(!list.length){msg.textContent='No scores yet. Be the first!';return;}
+    msg.textContent=list.length+(list.length===1?' player':' players');
+    const mine=me?list.findIndex(v=>v.name.toLowerCase()===me.name.toLowerCase()):-1;
+    list.slice(0,10).forEach((v,i)=>ul.append(lbRow(i+1,v,i===mine)));
+    if(mine>=10){const dots=document.createElement('li');dots.textContent='…';ul.append(dots);ul.append(lbRow(mine+1,list[mine],true));}
+  }catch(e){
+    const msg=$('#lbMsg');if(msg)msg.textContent='Leaderboard not available right now. Check your connection.';
+  }
 }
 
 /* ================= update ================= */
@@ -630,11 +724,13 @@ function drawGoal(L,cx){
 function hud(){
   ctx.font='bold 12px Georgia';ctx.textBaseline='top';
   const sh=(t,x,y,c)=>{ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(t,x+1,y+1);ctx.fillStyle=c||'#f4ead2';ctx.fillText(t,x,y);};
+  ctx.save();ctx.translate(SAFE_L,0);
   heartShape(8,8,'#ff5d78');sh('x '+stats.hearts,22,6);
   ctx.fillStyle='#f2c230';ctx.beginPath();ctx.arc(74,13,5,0,7);ctx.fill();sh('x '+stats.coins,84,6);
   sh(DEFS[lvIdx].name,8,24,'#e8c46a');
   if(weight>0){sh('Pride weight: '+'■'.repeat(Math.min(weight,12)),8,40,'#f2c230');sh('Hearts make you light!',8,54,'#ffd9de');}
-  sh('Score '+score(),W-120,6);
+  ctx.restore();
+  sh('Score '+score(),W-214-SAFE_R,6);
   // progress bar
   const pr=Math.max(0,Math.min(1,P.x/LV.goalX));
   R(W/2-70,8,140,5,'rgba(0,0,0,.5)');R(W/2-70,8,140*pr,5,'#e8c46a');
@@ -642,12 +738,12 @@ function hud(){
 function drawControls(){
   const act=stick.id!==null;
   ctx.globalAlpha=act?.35:.18;
-  const bx=act?stick.ox:92,by=act?stick.oy:282;
+  const bx=act?stick.ox:92+SAFE_L,by=act?stick.oy:282;
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,38,0,7);ctx.fill();
   ctx.globalAlpha=act?.6:.25;
   ctx.beginPath();ctx.arc(bx+(act?stick.x*34:0),by+(act?stick.y*10:0),17,0,7);ctx.fill();
-  ctx.globalAlpha=jumpHeld?.45:.2;ctx.beginPath();ctx.arc(565,282,36,0,7);ctx.fill();
-  ctx.globalAlpha=.8;ctx.fillStyle='#1a1420';ctx.font='bold 13px Georgia';ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillText('JUMP',565,282);
+  const jx=W-75-SAFE_R;ctx.globalAlpha=jumpHeld?.45:.2;ctx.beginPath();ctx.arc(jx,282,36,0,7);ctx.fill();
+  ctx.globalAlpha=.8;ctx.fillStyle='#1a1420';ctx.font='bold 13px Georgia';ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillText('JUMP',jx,282);
   ctx.textAlign='left';ctx.globalAlpha=1;
 }
 function drawParts(cx){for(const q of parts){ctx.globalAlpha=Math.max(0,Math.min(1,q.l*2));R(q.x-cx,q.y,3,3,q.c);}ctx.globalAlpha=1;}
@@ -675,21 +771,22 @@ function drawTitleBg(){
   person(280,GY-26,1,false,Object.assign({},pipLook(0)));
 }
 function drawEnd(){
+  const cx=W/2;
   const g=ctx.createLinearGradient(0,0,0,GY);g.addColorStop(0,'#f2a65a');g.addColorStop(.6,'#fbd28a');g.addColorStop(1,'#fdeab4');
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#fff3c2';ctx.beginPath();ctx.arc(320,210,46,0,7);ctx.fill();
-  ctx.fillStyle='#9a6a58';ctx.beginPath();ctx.ellipse(120,GY,230,70,0,Math.PI,0);ctx.fill();
-  ctx.beginPath();ctx.ellipse(540,GY,260,90,0,Math.PI,0);ctx.fill();
-  drawProp({t:'pillar',h:70},90);drawProp({t:'pillar',h:46},150);drawProp({t:'arch'},470);drawProp({t:'pillar',h:60},560);
+  ctx.fillStyle='#fff3c2';ctx.beginPath();ctx.arc(cx,210,46,0,7);ctx.fill();
+  ctx.fillStyle='#9a6a58';
+  for(const [hx,rx,ry] of [[cx-200,230,70],[cx+220,260,90],[-20,200,60],[W+20,200,80]]){ctx.beginPath();ctx.ellipse(hx,GY,rx,ry,0,Math.PI,0);ctx.fill();}
+  drawProp({t:'pillar',h:70},cx-230);drawProp({t:'pillar',h:46},cx-170);drawProp({t:'arch'},cx+150);drawProp({t:'pillar',h:60},cx+240);
   R(0,GY,W,H-GY,'#6a8a4a');R(0,GY,W,5,'#86b05c');
   for(let x=0;x<W;x+=30)R(x+8,GY+14+((x/30|0)%3)*8,10,3,'rgba(0,0,0,.14)');
-  const bx=292+Math.sin(tAnim*.8)*1;
+  const bx=cx-28+Math.sin(tAnim*.8)*1;
   person(bx,GY-26,1,false,{top:'#4f7ab0',legs:'#3c3226',hair:'#5a3a22'});
   person(bx+20,GY-26,-1,false,{dress:'#4a6fb0',hem:'#3a5890',hair:'#2a1c14',bun:true});
   R(bx+13,GY-12,8,2,'#f0c9a0');
 }
 function drawEndParts(){
-  if(Math.random()<.08)parts.push({x:180+Math.random()*280,y:GY-30,vx:(Math.random()-.5)*20,vy:-30-Math.random()*30,l:2.6,c:'#ff5d78',k:'up'});
+  if(Math.random()<.08)parts.push({x:W/2-140+Math.random()*280,y:GY-30,vx:(Math.random()-.5)*20,vy:-30-Math.random()*30,l:2.6,c:'#ff5d78',k:'up'});
   for(const q of parts){ctx.globalAlpha=Math.min(1,q.l);heartShape(q.x,q.y,q.c);}
   ctx.globalAlpha=1;
 }
